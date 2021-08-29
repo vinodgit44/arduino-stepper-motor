@@ -1,0 +1,143 @@
+//Libraries
+#include <Ethernet.h>//https://github.com/CisecoPlc/Arduino-W5100-W5200/tree/master/Ethernet
+//Parameters
+String request ;
+unsigned long refreshCounter  = 0;
+byte mac [6] = {0x54, 0x34, 0x41, 0x30, 0x30, 0x31};
+//Objects
+int driverPUL = 7;    // PUL- pin
+int driverDIR = 6;
+int pd = 500;       // Pulse Delay period
+//boolean setdir = LOW;
+
+EthernetServer server(80);
+IPAddress ip(192, 168, 1, 124);
+EthernetClient client;
+void setup() {
+  
+  pinMode (driverPUL, OUTPUT);
+  pinMode (driverDIR, OUTPUT);
+ //Init Serial USB
+ Serial.begin(9600);
+ Serial.println(F("Initialize System"));
+ //Init W5100
+ Ethernet.begin(mac, ip);
+ while (!Ethernet.begin(mac)) {
+   Serial.println(F("failed. Retrying in 5 seconds."));
+   delay(5000);
+   Serial.print(F("Starting W5100..."));
+ }
+ pinMode(2, OUTPUT);
+ server.begin();
+ Serial.println(F("W5100 initialized"));
+ Serial.print(F("IP Address: "));
+ Serial.println(Ethernet.localIP());
+}
+void loop() {
+ client = server.available();
+ clientRequest();
+ handleRequest();
+}
+void clientRequest( ) { /* function clientRequest */
+ ////Get client request
+ if (!client) {
+   return;
+ }
+ // Wait until the client sends some data
+ while (!client.available()) {
+   delay(1);
+ }
+ request = client.readStringUntil('\r'); // Read the first line of the request
+ Serial.println(request);
+ client.flush();
+}
+
+void mon()
+{
+    digitalWrite(driverDIR,HIGH);
+    digitalWrite(driverPUL,HIGH);
+    delayMicroseconds(pd);
+    digitalWrite(driverPUL,LOW);
+    delayMicroseconds(pd);
+  }
+void mof()
+{
+    digitalWrite(driverDIR,LOW);
+    digitalWrite(driverPUL,LOW);
+    delayMicroseconds(pd);
+    digitalWrite(driverPUL,LOW);
+    delayMicroseconds(pd);
+  }
+void mod()
+{
+    digitalWrite(driverDIR,LOW);
+    digitalWrite(driverPUL,HIGH);
+    delayMicroseconds(pd);
+    digitalWrite(driverPUL,LOW);
+    delayMicroseconds(pd);
+  }
+  
+void handleRequest( ) { /* function handleRequest */
+ ////Handle web client request
+ if (request.indexOf('GET') >= 0) {
+   {
+     webpage(client);
+     client.stop();
+   }
+ }
+ if (request.indexOf("/on") > 0) {
+   {
+     mon();
+   }
+ }
+ if (request.indexOf("/off") > 0) {
+   {
+     mof();
+   }}
+    if (request.indexOf("/dir") > 0) {
+   {
+     mod();
+   }
+    }
+     
+ 
+}
+void webpage(EthernetClient client) { /* function webpage */
+ ////Send webpage to client
+ //output HTML data header
+ client.println(F("HTTP/1.1 200 OK"));
+ client.println(F("Content-Type: text/html"));
+ client.println();
+ //header
+ client.print(F("<!DOCTYPE HTML><html><head><title>EMW motor</title>"));
+ client.print(F("<meta http-equiv='content-type' content='text/html; charset=UTF-8'>"));
+ //meta-refresh page every x seconds
+// client.print(F("<meta http-equiv='refresh' content='2'>"));
+ client.print(F("</head><body bgcolor='black'><br>"));
+ client.print(F("<hr/><hr>"));
+ client.print(F("<h1 style='color : #3AAA35;'><center>  microwave web  Controller </center></h1>"));
+ client.print(F("<hr/><hr>"));
+ client.print("<center><p style='color:white;'>");
+ client.print(F("Page refresh number : "));
+ client.print(refreshCounter); //current refresh count
+ client.print("</p></center><br>");
+// client.print(F("<h2 style='color:green;'>Arduino Inputs</h2>"));
+ client.print("<p style='color:white;'>");
+ client.print("<br><br>");
+ 
+ client.print(F("</p><br>"));
+ //digital output
+ client.print(F("<h2 style='color:green;'>Arduino Outputs</h2>"));
+ client.print(F("<p style='color:white;'>"));
+ client.print(F("<br><br>"));
+ client.print(F("<b>MOTOR state : </b>"));
+// client.print("<input value=" + String(digitalRead(2)) + " readonly></input>");
+ client.print(F("<a href='/on'><button>Turn On </button></a>"));
+// client.print(F("<a href='/left'><button>Turn left </button></a>"));
+ client.print(F("<a href='/dir'><button>Direction change </button></a>"));
+ client.print(F("<a href='/off'><button>Turn Off </button></a><br />"));
+ client.print(F("</p><br>"));
+ //file end
+ client.print(F("<br></body></html>"));
+ refreshCounter += 1;
+}
